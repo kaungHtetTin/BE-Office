@@ -1,5 +1,5 @@
 <?php
-include('connect.php');
+include_once('connect.php');
 
 class Product {
     public function getProducts(){
@@ -48,6 +48,7 @@ class Product {
         }
 
         $result['main_product']=$products;
+       
 
         return $result;
     }

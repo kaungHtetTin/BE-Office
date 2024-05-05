@@ -1,6 +1,6 @@
 <?php
-include('connect.php');
-include('auth.php');
+include_once('connect.php');
+include_once('auth.php');
 
 class Group{
 
@@ -78,7 +78,7 @@ class Group{
 
     public function getGroupMembers($data){
 
-        $offset=30;
+        $offset=50;
         $page=$data['page'];
         $page=$page-1;
         
@@ -88,11 +88,19 @@ class Group{
         $query="select user_id,name,profile_image from group_members 
                 join users on member_id=user_id
                 where group_id=$group_id and disable=0
+                ORDER BY group_members.id DESC
                 limit $count,$offset ";
 
         $DB=new Database();
         $result=$DB->read($query);
         $response['members']=$result;
+
+        $query = "SELECT count(*) as total FROM group_members WHERE group_id=$group_id and disable=0";
+        $total_member = $DB->read($query);
+
+        $response['total']=$total_member[0]['total'];
+        $response['offset']=$offset;
+
         return $response;
 
 
@@ -129,11 +137,13 @@ class Group{
                     
                     if($check){
                         $Info[$member_name]="had already added in this group";
+                        $query="update group_members set disable=0 where group_id=$group_id and member_id=$member_id";
+                        $DB->save($query);
                     }else{
-                            $query="insert into group_members (group_id,member_id,time) values($group_id,$member_id,$time)";
-                            $save=$DB->save($query);
-           
-                            $Info[$member_name]="had successfully added in this group";
+                        $query="insert into group_members (group_id,member_id,time) values($group_id,$member_id,$time)";
+                        $save=$DB->save($query);
+       
+                        $Info[$member_name]="had successfully added in this group";
                     
                     }
                 }
@@ -282,6 +292,8 @@ class Group{
         $DB=new Database();
         $result=$DB->read($query);
 
+        if(!$result) return false;
+
         $query ="select * from target_plans where user_id=$group_id";
         $target_plan=$DB->read($query);
 
@@ -291,7 +303,7 @@ class Group{
         return $result[0];
     }
 
-     public function getAboutGroup($group_id){
+    public function getAboutGroup($group_id){
         $query="select
         group_name,group_description,group_image,groups.time as group_create_at,
         name as founder,profile_image,phone,group_members.time as join_at
@@ -302,6 +314,8 @@ class Group{
         ";
         $DB=new Database();
         $result=$DB->read($query);
+
+        if(!$result) return false;
 
         return $result[0];
 
@@ -401,4 +415,10 @@ class Group{
         return $response;
     }
 
+    public function isMember($user_id, $group_id){
+        $query = "SELECT * FROM group_members WHERE group_id =$group_id AND member_id=$user_id";
+        $DB =new Database();
+        $result = $DB->read($query);
+        return $result;
+    }
 }

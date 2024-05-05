@@ -1,6 +1,6 @@
 <?php 
-include('connect.php');
-include('auth.php');
+include_once('connect.php');
+include_once('auth.php');
 
 class Stock{
      
@@ -113,7 +113,6 @@ class Stock{
             return $response;
         }
     }
-
 
     public function transferProduct($data){
         $user_id=$data['user_id'];

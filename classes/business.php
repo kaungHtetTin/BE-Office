@@ -1,7 +1,7 @@
 <?php
-include('connect.php');
-include('auth.php');
-include('notificationpusher.php');
+include_once('connect.php');
+include_once('auth.php');
+include_once('notificationpusher.php');
 
 class Business{
     public function sentOrder($data){
@@ -133,8 +133,6 @@ class Business{
 
     }
 
-
-
     public function getOrdersByAgent($data){
         $user_id=$data['user_id'];
         $is_sold_out=$data['is_sold_out'];
@@ -168,11 +166,16 @@ class Business{
     public function getOrderDetail($data){
         $voucher_id=$data['voucher_id'];
         $user_id=$data['user_id'];
+       
 
         $DB=new Database();
         $query1="select * from businesses where voucher_id=$voucher_id";
         $result1=$DB->read($query1);
-        if($result1)$response['order']=$result1[0];
+        if($result1){
+            $response['order']=$result1[0];
+        }else{
+            return false;
+        }
 
         $group_id=$result1[0]['group_id'];
         $seen=$result1[0]['seen'];
@@ -302,11 +305,22 @@ class Business{
         $stock_id=$data['stock_id'];
         $DB=new Database();
 
+       
+
         $Auth=new Auth();
         $userData=$Auth->checkAuthAndGetData($user_id,$auth_token);
         if($userData==null){
             $response['status']="fail";
             $response['error']="auth fail";
+            return $response;
+        }
+
+        //check transaction state
+        $query="select * from businesses where voucher_id=$voucher_id limit 1";
+        $result=$DB->read($query)[0];
+        if($result['is_sold_out']=="1"){
+            $response['status']="fail";
+            $response['error']="Invalid Request";
             return $response;
         }
         
@@ -356,6 +370,8 @@ class Business{
             return $response;
         }
 
+        
+
        //send notification
        $query="select * from businesses where voucher_id=$voucher_id limit 1";
        $result=$DB->read($query);
@@ -364,13 +380,14 @@ class Business{
        $query="select * from users where user_id=$agent_id limit 1";
        $result=$DB->read($query);
        $token=$result[0]['fcm_token'];
+       
+        $query="update businesses set is_sold_out=1,stock_id=$stock_id where voucher_id=$voucher_id and admin_id=$user_id";
+    
+        $result=$DB->save($query);
 
         $pusher =new NotificationPusher();
         $pusher->pushNotificationToSingleUser($token,"Order Delivered","Your business partner has delivered an order");
 
-       
-        $query="update businesses set is_sold_out=1,stock_id=$stock_id where voucher_id=$voucher_id and admin_id=$user_id";
-        $result=$DB->save($query);
         if($result){
             $response['status']="success";
             return $response;
@@ -395,6 +412,15 @@ class Business{
         if($userData==null){
             $response['status']="fail";
             $response['error']="auth fail";
+            return $response;
+        }
+
+        //check transaction state
+        $query="select * from businesses where voucher_id=$voucher_id limit 1";
+        $result=$DB->read($query)[0];
+        if($result['is_received']=="1"){
+            $response['status']="fail";
+            $response['error']="Invalid Request";
             return $response;
         }
 
@@ -466,6 +492,7 @@ class Business{
         $response['status']="success";
         return $response;
     }
+    
 
     public function cancelOrderByAdmin($data){
         $user_id=$data['user_id'];
@@ -513,9 +540,6 @@ class Business{
             return $response;
         }
        
-      
-
-
         if(isset($data['voucher_cancel'])){
             $del1="DELETE FROM business_details where voucher_id=$voucher_id";
             $del2="DELETE FROM businesses where voucher_id=$voucher_id";
@@ -534,7 +558,7 @@ class Business{
             return $response;
         }else{
             $response['status']="fail";
-            $response['error']="business update fail";
+            $response['error']="business update fail 123";
             return $response;
         }
     }
@@ -622,7 +646,7 @@ class Business{
 
         if($customer=="yoe"){
             $query="select  
-            voucher_id,total_amount,customer_name,is_agent
+            voucher_id,total_amount,customer_name,is_agent,customer_phone
             from businesses
             join sales
             using (voucher_id)
@@ -632,7 +656,7 @@ class Business{
             ";
         }else{
             $query="select  
-            voucher_id,total_amount,customer_name,is_agent
+            voucher_id,total_amount,customer_name,is_agent,customer_phone
             from businesses
             join sales
             using (voucher_id)
@@ -654,8 +678,9 @@ class Business{
         $voucher_id=$data['voucher_id'];
 
         $DB=new Database();
-        $query1 ="select stock_id,admin_extra_cost from businesses where voucher_id=$voucher_id and admin_id=$user_id";
+        $query1 ="select stock_id,admin_extra_cost,total_amount from businesses where voucher_id=$voucher_id and admin_id=$user_id";
         $voucher=$DB->read($query1);
+        if(!$voucher) return false;
         $response['voucher']=$voucher[0];
 
         $stock_id=$voucher[0]['stock_id'];
@@ -665,6 +690,7 @@ class Business{
 
         $query3="select is_agent,customer_phone,customer_name,customer_address,delivery_fee from sales where voucher_id=$voucher_id";
         $sale=$DB->read($query3);
+        if(!$sale) return false;
         $response['sale']=$sale[0];
 
         $query4="select
@@ -682,7 +708,114 @@ class Business{
 
         return $response;
     }
+    
+    public function updateData($data){
+        $user_id=$data['user_id'];
+        $voucher_id=$data['content_id'];
+        $auth_token=$data['auth_token'];
+        $key=$data['key'];
+        $value=$data['value'];
 
+        $Auth=new Auth();
+        $userData=$Auth->checkAuthAndGetData($user_id,$auth_token);
+        if($userData!=null){
+            $query="update businesses set $key='$value' where voucher_id=$voucher_id";
+            $DB=new Database();
+            $result=$DB->save($query);
+            if($result){
+                $response['status']="success";
+                return $response;
+            }else{
+                $response['status']="fail";
+                return $response;
+            }
+           
+        }else{
+            $response['status']="fail";
+            return $response;
+        }
+    }
+
+    public function getReceivable($data){
+        $admin_id=$data['user_id'];
+        
+        $query="
+            SELECT
+            agent_id as user_id,
+            name,
+            profile_image,
+            SUM(remaining_amount) AS total_amount
+            FROM
+            businesses 
+            JOIN users ON users.user_id=businesses.agent_id
+            WHERE admin_id=$admin_id AND remaining_amount>0
+            GROUP By agent_id
+        ";
+        
+        $DB=new Database();
+        $result=$DB->read($query);
+        
+        return $result;
+        
+    }
+    
+    public function getPayable($data){
+        $agent_id=$data['user_id'];
+        
+        $query="
+            SELECT
+            admin_id as user_id,
+            name,
+            profile_image,
+            SUM(remaining_amount) AS total_amount
+            FROM
+            businesses 
+            JOIN users ON users.user_id=businesses.admin_id
+            WHERE agent_id=$agent_id AND remaining_amount>0
+            GROUP By agent_id
+        ";
+        
+        $DB=new Database();
+        $result=$DB->read($query);
+        
+        return $result;
+    }
+    
+    public function getRemaindingVoucher($data){
+        $user_id=$data['user_id'];
+        $payable=$data['payable'];
+
+        $offset=30;
+        $page=$data['page'];
+        $page=$page-1;
+        $count=$page*$offset;
+
+
+        if($payable==1){
+            $query="select  
+                voucher_id,total_amount,group_name,seen,is_sold_out,is_received,group_image
+                from businesses
+                join groups using (group_id)
+                where businesses.admin_id=$user_id and remaining_amount>0
+                order by businesses.id desc
+                limit $count,$offset
+                ";
+        }else{
+            $query="select  
+                voucher_id,total_amount,group_name,seen,is_sold_out,is_received,group_image
+                from businesses
+                join groups using (group_id)
+                where businesses.agent_id=$user_id and remaining_amount>0
+                order by businesses.id desc
+                limit $count,$offset
+                ";
+        }
+
+        $DB=new Database();
+        $result=$DB->read($query);
+        $response['orders']=$result;
+        return $response;
+    }
 }
 
 ?>

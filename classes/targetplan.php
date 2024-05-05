@@ -1,9 +1,10 @@
 <?php 
-include('connect.php');
-include('auth.php');
+include_once('connect.php');
+include_once('auth.php');
 
 class TargetPlan{
     public function addNewTargetPlan($data){
+
         $user_id=$data['user_id'];
         $start_date=$data['start_date']/1000;
         $end_date=$data['end_date']/1000;
@@ -68,6 +69,7 @@ class TargetPlan{
         $DB=new Database();
         $result=$DB->read($query);
         $response['plans']=$result;
+         
         return $response;
 
 
@@ -111,6 +113,7 @@ class TargetPlan{
 
         $query="select * from target_plans where target_plan_id=$target_plan_id limit 1";
         $plan=$DB->read($query);
+        $response['main']= $plan[0];
 
         $initial_time=$plan[0]['start_date'];
         $final_time=$plan[0]['end_date'];
@@ -120,7 +123,9 @@ class TargetPlan{
         $query="select * from target_plan_details where target_plan_id=$target_plan_id";
         $result=$DB->read($query);
 
+
         if($result){
+            
             for($i=0;$i<count($result);$i++){
                 $product_id=$result[$i]['product_id'];
                 $plans[$product_id]['count']=$result[$i]['count'];
@@ -139,7 +144,8 @@ class TargetPlan{
             using (voucher_id)
             where business_details.voucher_id>=$initial_time and business_details.voucher_id<= $final_time and admin_id=$user_id
             group by product_id";
-        $result1=$DB->read($query1);
+        
+            $result1=$DB->read($query1);
 
         if($result1){
             for($i=0;$i<count($result1);$i++){

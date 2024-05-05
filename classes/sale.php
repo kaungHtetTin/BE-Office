@@ -1,6 +1,6 @@
 <?php
-include('connect.php');
-include('auth.php');
+include_once('connect.php');
+include_once('auth.php');
 
 class Sale{
     public function getCustomers($data){
@@ -52,6 +52,13 @@ class Sale{
         $DB=new Database();
         $result=$DB->read($query);
 
+        return $result;
+    }
+
+    public function getDetail($phone){
+        $query = "SELECT * FROM sales WHERE customer_phone = $phone limit 1";
+        $DB = new Database();
+        $result = $DB->read($query);
         return $result;
     }
 }
